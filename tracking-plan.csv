@@ -1,6 +1,6 @@
 event,trigger,properties,source
 Session Started,Explicit new anonymous session or synthetic visit,"entry_point; landing_page; data_source",live and synthetic
-Page Viewed,Hash route navigation,"page_path; page_type; data_source",live and synthetic
+[Amplitude] Page Viewed,Autocapture on live navigation; matching HTTP events in new historical datasets,"[Amplitude] Page Domain; [Amplitude] Page Location; [Amplitude] Page Path; [Amplitude] Page Title; [Amplitude] Page URL; [Amplitude] Page View ID; [Amplitude] Page Counter; data_source",autocapture live and synthetic
 Product List Viewed,View all products,"category; result_count; sale; data_source",live
 Category Viewed,View category,"category; result_count; data_source",live and synthetic
 Search Performed,Submit product search,"query; result_count; data_source",live and synthetic

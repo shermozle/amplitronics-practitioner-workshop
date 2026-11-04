@@ -1,7 +1,32 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
 import {createRun,generateBacklog,sendBatch,uploadBacklog} from '../backlog.js';
 const now=Date.UTC(2026,10,5,12),run=createRun(now,'test-fixture'),data=generateBacklog(run);
+test('historical page views match Autocapture schema and follow the actual hash routes',()=>{
+ assert.equal(run.version,2);
+ assert(!data.events.some(event=>event.event_type==='Page Viewed'));
+ const views=data.events.filter(event=>event.event_type==='[Amplitude] Page Viewed');
+ assert(views.length>data.summary.sessions);
+ const ids=new Set(),routes=new Set();
+ for(const session of Map.groupBy(views,event=>`${event.device_id}:${event.session_id}`).values()){
+  session.forEach((event,index)=>{
+   const props=event.event_properties,url=new URL(props['[Amplitude] Page Location']);
+   assert.equal(props['[Amplitude] Page Domain'],url.hostname);
+   assert.equal(props['[Amplitude] Page Path'],'/amplitronics-practitioner-workshop/');
+   assert.equal(props['[Amplitude] Page URL'],decodeURI(url.href).split('?')[0]);
+   assert.match(props['[Amplitude] Page Title'],/ · Amplitronics$/);
+   assert.equal(props['[Amplitude] Page Counter'],index+1);
+   assert.match(props['[Amplitude] Page View ID'],/^[\da-f]{8}-[\da-f]{4}-4[\da-f]{3}-8[\da-f]{3}-[\da-f]{12}$/);
+   ids.add(props['[Amplitude] Page View ID']);routes.add(url.hash.split('?')[0]);
+  });
+ }
+ assert.equal(ids.size,views.length);
+ for(const route of ['#/','#/cart','#/checkout','#/confirmation'])assert(routes.has(route));
+ assert([...routes].some(route=>route.startsWith('#/product/')));
+ const checkoutSessions=Map.groupBy(data.events,event=>`${event.device_id}:${event.session_id}`);
+ for(const session of checkoutSessions.values())if(session.some(event=>event.event_type==='Payment Submitted'))assert.equal(session.filter(event=>event.event_type==='[Amplitude] Page Viewed'&&new URL(event.event_properties['[Amplitude] Page Location']).hash==='#/checkout').length,1);
+});
 test('30 complete UTC days, exactly 200 distinct daily visitors, returning users',()=>{
  const days=new Map();for(const event of data.events){const date=new Date(event.time).toISOString().slice(0,10);if(!days.has(date))days.set(date,new Set());days.get(date).add(event.device_id);assert(event.time<Math.floor(now/86400000)*86400000);assert(event.time>=run.start);assert(event.session_id<=event.time);}
  assert.equal(days.size,30);for(const ids of days.values())assert.equal(ids.size,200);
@@ -40,4 +65,9 @@ test('pause stops outstanding work without losing resumable position',async()=>{
  const checkpoint={cursor:0},controller=new AbortController();
  await assert.rejects(uploadBacklog(data.events.slice(0,100),checkpoint,{apiKey:'placeholder',region:'US',signal:controller.signal,fetchFn:async(_,req)=>response(200,JSON.parse(req.body).events.length),sleep:async()=>{},onProgress:n=>{if(n>=30)controller.abort();}}),{name:'AbortError'});
  assert(checkpoint.cursor>=30&&checkpoint.cursor<100);
+});
+
+test('legacy recipes regenerate byte-for-byte to preserve existing upload checkpoints',()=>{
+ const legacy={version:1,seed:'legacy-fixture',start:Math.floor(now/86400000)*86400000-30*86400000,days:30,usersPerDay:200,cursor:0,createdAt:now};
+ assert.equal(createHash('sha256').update(JSON.stringify(generateBacklog(legacy))).digest('hex'),'78ab33c4f9f485029d48013d819a697c852b5fb9cbfa17c0c39f1697f15389f7');
 });

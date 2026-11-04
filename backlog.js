@@ -1,4 +1,5 @@
 import {products,productProperties} from './catalog.js';
+import {DEFAULT_SITE_URL,historicalPageProperties} from './pageview.js';
 const DAY=86400000;
 export const channels=[
  {name:'Paid Search',source:'google',medium:'cpc',campaign:'spring_tech_search',weight:24,intent:.57,referrer:'https://www.google.com/'},
@@ -12,9 +13,11 @@ function hash(text){let n=2166136261;for(const ch of text){n^=ch.charCodeAt(0);n
 function rng(seed){let n=hash(seed);return()=>{n+=0x6D2B79F5;let t=n;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};}
 function choose(list,r){return list[Math.floor(r()*list.length)];}
 function channel(r){let n=r()*100;return channels.find(c=>(n-=c.weight)<0)||channels.at(-1);}
-export function createRun(now=Date.now(),seed='spring-tech-v1') {return {version:1,seed,start:Math.floor(now/DAY)*DAY-30*DAY,days:30,usersPerDay:200,cursor:0,createdAt:now};}
+export function createRun(now=Date.now(),seed='spring-tech-v2',siteUrl=DEFAULT_SITE_URL) {return {version:2,siteUrl,seed,start:Math.floor(now/DAY)*DAY-30*DAY,days:30,usersPerDay:200,cursor:0,createdAt:now};}
 export function generateBacklog(run) {
- if(run.version!==1||run.days!==30||run.usersPerDay!==200||!Number.isFinite(run.start))throw new Error('Unsupported backlog recipe');
+ if(![1,2].includes(run.version)||run.days!==30||run.usersPerDay!==200||!Number.isFinite(run.start))throw new Error('Unsupported backlog recipe');
+ // Preserve v1 recipes exactly: changing an in-progress dataset would invalidate saved upload offsets.
+ const legacy=run.version===1;
  const r=rng(`${run.seed}:${run.start}`),events=[],daily=[],unique=new Set();
  const summary={dailyVisitors:6000,uniqueUsers:0,sessions:0,purchases:0,errors:0,recoveredPurchases:0,revenue:0,channels:{},daily};
  for(let day=0;day<30;day++){
@@ -22,8 +25,9 @@ export function generateBacklog(run) {
   for(let visitor=0;visitor<200;visitor++){
    // Sixty visitors return across days; 140 are new. Exactly 200 distinct devices on each day.
    const person=visitor<60?`returning-${visitor}`:`new-${day}-${visitor}`;
-   const device=`seed-${hash(run.seed).toString(16)}-${person}`,known=visitor<60||r()<.30;
-   unique.add(device);const user=known?`shopper-${hash(run.seed).toString(16)}-${person}`:null;
+   const namespace=hash(legacy?run.seed:`${run.seed}:v2`).toString(16);
+   const device=`seed-${namespace}-${person}`,known=visitor<60||r()<.30;
+   unique.add(device);const user=known?`shopper-${namespace}-${person}`:null;
    const personRng=rng(`${run.seed}:${person}`);const mobile=personRng()<.59,ch=channel(r),p=choose(products.filter(p=>p.category!=='games'||r()<.5),r);
    const country=choose(['Australia','Australia','Australia','New Zealand','United States','United Kingdom'],personRng);
    const userProps={rewards_tier:visitor<60?'Gold':known?'Bronze':'None',customer_type:visitor<60?'Returning':'New',preferred_category:p.category};
@@ -33,21 +37,36 @@ export function generateBacklog(run) {
    for(let session=0;session<sessions;session++){
     summary.sessions++;const sid=date+(7*60*60+Math.floor(r()*11*60*60)+session*3*60*60)*1000;let time=sid,index=0;
     const emit=(name,props={},extra={})=>{time+=Math.floor(3+r()*35)*1000;events.push({event_type:name,device_id:device,...(user?{user_id:user}:{}),session_id:sid,time,insert_id:`${device}-${date}-${session}-${index++}`,platform:'Web',os_name:mobile?'iOS':'Windows',country,language:'en',user_properties:userProps,event_properties:{...common,...props},...extra});};
-    emit('Session Started',{landing_page:ch.medium==='cpc'?`#/product/${p.id}`:'#/'});
-    emit('Page Viewed',{page_type:'home',page_path:'/'});
+    let pageCounter=0;
+    const page=route=>{
+     if(legacy)return;
+     const key=`${device}-${date}-${session}-page-${++pageCounter}`;
+     const hex=Array.from({length:4},(_,i)=>hash(`${key}:${i}`).toString(16).padStart(8,'0')).join('');
+     const pageViewId=`${hex.slice(0,8)}-${hex.slice(8,12)}-4${hex.slice(13,16)}-8${hex.slice(17,20)}-${hex.slice(20)}`;
+     const campaign=['cpc','paid_social','email'].includes(ch.medium)?{utm_source:ch.source,utm_medium:ch.medium,utm_campaign:ch.campaign}:{};
+     emit('[Amplitude] Page Viewed',historicalPageProperties({siteUrl:run.siteUrl,route,campaign,pageViewId,counter:pageCounter}));
+    };
+    const landing=ch.medium==='cpc'?`/product/${p.id}`:'/';
+    emit('Session Started',{landing_page:`#${landing}`});
+    if(legacy)emit('Page Viewed',{page_type:'home',page_path:'/'});
+    else {page(landing);if(landing!=='/')emit('Product Viewed');}
     if(r()<.24)continue;
-    if(r()<.34)emit('Search Performed',{query:p.category,result_count:products.filter(x=>x.category===p.category).length});
+    if(r()<.34){page(`/shop?q=${encodeURIComponent(p.category)}`);emit('Search Performed',{query:p.category,result_count:products.filter(x=>x.category===p.category).length});}
+    page(`/shop?category=${p.category}`);
     emit('Category Viewed',{category:p.category});
+    page(`/product/${p.id}`);
     emit('Product Viewed');
     if(r()<.16)emit('Wishlist Updated',{action:'added'});
     if(r()>ch.intent)continue;
     const qty=r()<.09?2:1;
     emit('Product Added to Cart',{quantity:qty,cart_value:p.price*qty});
+    page('/cart');
     emit('Cart Viewed',{item_count:qty,subtotal:p.price*qty});
     if(r()<.24)continue;
     const discounted=ch.medium==='email'||r()<.14;
     if(discounted)emit('Coupon Applied',{coupon:'AMP10',discount:p.price*qty*.1});
     const subtotal=p.price*qty,discount=discounted?Math.round(subtotal*10)/100:0,shipping=subtotal-discount>=150?0:9.95,total=Math.round((subtotal-discount+shipping)*100)/100;
+    page('/checkout');
     emit('Checkout Started',{item_count:qty,subtotal,total});
     if(r()<.14)continue;
     emit('Checkout Step Completed',{step:'delivery',shipping_method:'standard'});
@@ -64,6 +83,7 @@ export function generateBacklog(run) {
      emit('Payment Submitted',{payment_method:'card',attempt:2,total});
     }else if(r()<.05)continue;
     emit('Order Completed',{order_id:`SEED-${day}-${visitor}-${session}`,item_count:qty,subtotal,discount,shipping,total,products:[{product_id:p.id,quantity:qty,price:p.price}]},{revenue:total,currency:'AUD',revenueType:'purchase'});
+    page('/confirmation');
     summary.purchases++;stat.purchases++;summary.revenue+=total;if(error)summary.recoveredPurchases++;
     if(r()<.23)emit('Store Feedback Submitted',{rating:choose([4,4,5,5,5],r),context:'post_purchase'});
    }

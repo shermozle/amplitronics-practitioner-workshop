@@ -43,6 +43,8 @@ Startup order:
 4. Restore known-user traits and flush events queued during startup.
 5. Load the project-specific `.experiment.js` Web Experiment tag. US and EU use their respective project-tag CDN hosts.
 
+Live page views are emitted solely by Autocapture as `[Amplitude] Page Viewed`; the app does not send a separate custom `Page Viewed` event. New historical datasets use the same native event name and standard Amplitude page properties for landing, category/search, product, cart, checkout and confirmation navigation. Page paths retain the GitHub Pages project prefix; hash routes appear in page locations, and page URLs follow the SDK’s `location.href.split('?')[0]` rule. Delivery/payment steps that do not change the URL do not create extra page views.
+
 Analytics custom events carry `data_source: live`, session/device/user IDs, insert IDs, currency, and available UTM properties. Purchase events carry top-level `revenue`, `currency`, and `revenueType`. There is one revenue-bearing event per order, avoiding a second revenue event that would double count purchases.
 
 Autocapture enables attribution, pages, sessions, files, forms, clicks, frustration, network tracking and web vitals. Form-submit tracking skips private controls, and the enrichment plugin drops automatic settings-form events. Private controls and payment fields are excluded from element/frustration tracking using the documented `shouldTrackEventResolver`. Meaningful delivery/payment interactions also have explicit custom events. The enrichment layer additionally scrubs value/card/email/address properties and any property containing the project key. The SDK’s own upload request necessarily includes the public ingestion key.
@@ -77,6 +79,8 @@ Uploads go directly to `https://api2.amplitude.com/2/httpapi` (US) or `https://a
 - Pause: abort in-flight work and preserve the last acknowledged prefix. Ambiguous requests are retried with identical insert IDs.
 - Resume: regenerate from the recipe, verify the project fingerprint and seven-day deduplication window, continue at the checkpoint. A newly generated dataset is a separate population and adds new data.
 
+New recipes use version 2 with a fixed site URL. Version 1 recipes that have already started retain their original generation and event order so saved upload positions remain valid. Unsent version 1 recipes are replaced on the next preview. Choose **New dataset** for Autocapture-compatible page views when an older recipe is present; already-ingested project events are not changed.
+
 A checkpoint is small and lives in localStorage; event datasets are regenerated, not stored there. The SHA-256 project fingerprint prevents accidentally resuming to a different project without duplicating the API key in the recipe. Checkpoint saves must succeed before uploading continues.
 
 Historical API events populate Analytics only. They cannot generate past browser replay recordings, real native experiment allocations, or guide/survey delivery artefacts. Run live sessions for those products. An actual Amplitude API key is intentionally not bundled, so end-to-end ingestion and project-delivered product experiences require participant verification.
@@ -87,6 +91,7 @@ Historical API events populate Analytics only. They cannot generate past browser
 | --- | --- |
 | `index.html`, `styles.css`, `app.js` | Static app shell, responsive store and controls |
 | `catalog.js`, `art.js` | Shared products, personas, local SVG art |
+| `pageview.js` | Shared page titles and Autocapture-compatible historical page properties |
 | `commerce.js` | Pure totals, validation and payment simulation |
 | `telemetry.js`, `storage.js` | SDK lifecycle, identity, event inspector, persistence |
 | `backlog.js` | Deterministic journeys and resumable HTTP uploader |

@@ -53,6 +53,8 @@ The generator creates exactly **200 distinct visitors per complete UTC day for 3
 
 Journeys include browsing, searching, wishlists, cart abandonment, shipping choices, payment errors, recovery, purchases, feedback, and six marketing channels. Paid search, paid social, organic search, email, direct and referral have different buying intent. Mobile checkout timeouts rise on days 18–24.
 
+Page views are named `[Amplitude] Page Viewed` in both live and new historical data. Live visits use Autocapture; the historical generator supplies the same standard page properties. No additional custom `Page Viewed` event is emitted. Older uploaded datasets remain in your project; choose **New dataset** for the updated history format.
+
 Filter `data_source = synthetic` for generated history or `data_source = live` for workshop visits. Use `dataset` to select an individual generated population. Campaigns are available as `utm_source`, `utm_medium`, `utm_campaign`, `channel`, and `referrer`.
 
 **Done when:** you have a hypothesis about the mobile checkout issue and can identify a marketing channel worth investigating.
