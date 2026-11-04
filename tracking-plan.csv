@@ -1,0 +1,28 @@
+event,trigger,properties,source
+Session Started,Explicit new anonymous session or synthetic visit,"entry_point; landing_page; data_source",live and synthetic
+Page Viewed,Hash route navigation,"page_path; page_type; data_source",live and synthetic
+Product List Viewed,View all products,"category; result_count; sale; data_source",live
+Category Viewed,View category,"category; result_count; data_source",live and synthetic
+Search Performed,Submit product search,"query; result_count; data_source",live and synthetic
+Product Viewed,View product detail,"product_id; product_name; category; brand; price; currency; data_source",live and synthetic
+Product List Sorted,Choose sort order,"sort; data_source",live
+Wishlist Updated,Toggle favourite,"product_id; action; data_source",live and synthetic
+Product Added to Cart,Add product or increase quantity,"product_id; category; price; quantity; cart_value; data_source",live and synthetic
+Product Removed from Cart,Remove product or decrease quantity,"product_id; quantity; cart_value; data_source",live
+Cart Viewed,Open cart,"item_count; subtotal; discount; shipping; total; data_source",live and synthetic
+Cart Error,Exceed stock or demo quantity limit,"error_code; product_id; data_source",live
+Coupon Applied,Apply AMP10,"coupon; discount; data_source",live and synthetic
+Coupon Rejected,Apply invalid promo code,"reason; data_source",live
+Checkout Started,Enter checkout,"item_count; subtotal; total; data_source",live and synthetic
+Shipping Method Selected,Choose delivery option,"shipping_method; data_source",live
+Checkout Step Completed,Complete delivery details,"step; shipping_method; data_source",live and synthetic
+Payment Submitted,Attempt card payment,"payment_method; attempt; total; data_source",live and synthetic
+Checkout Error,Validation or payment failure,"error_code; step; field; attempt; data_source",live and synthetic
+Order Completed,Successful simulated purchase,"order_id; item_count; subtotal; discount; shipping; total; currency; products; top-level revenue; data_source",live and synthetic
+Store Feedback Submitted,Post-purchase rating,"rating; context; data_source",live and synthetic
+User Signed In,Choose known persona,"rewards_tier; segment; data_source",live
+Account Viewed,Open account page,"logged_in; data_source",live
+Rewards Viewed,Open rewards page,"logged_in; data_source",live
+Help Viewed,Open help page,data_source,live
+Store Locator Viewed,Open store locator,data_source,live
+Application Error,Unhandled browser error,"error_code; message; data_source",live
