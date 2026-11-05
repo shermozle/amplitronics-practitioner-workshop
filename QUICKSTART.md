@@ -49,7 +49,7 @@ Switch back to Normal checkout when you want a successful purchase. The declined
 
 Open **30-day history** in the cog. Review the counts and dates, then select **Send 30-day backlog**. Keep the browser tab open. It may take several minutes; Pause and Resume use a saved checkpoint.
 
-The generator creates exactly **200 distinct visitors per complete UTC day for 30 days**. Sixty return across days and 140 are new each day: **6,000 visitor-days and 4,260 distinct users** in total. Some people have two sessions in a day.
+The generator covers **30 complete UTC days, averaging around 200 visitors a day**. Daily counts vary with weekday patterns, marketing campaigns and normal day-to-day noise. The mix of new and returning shoppers changes each day, and some people have two sessions. The preview shows the actual average, daily range, unique users, and visitor-days.
 
 Journeys include browsing, searching, wishlists, cart abandonment, shipping choices, payment errors, recovery, purchases, feedback, and six marketing channels. Paid search, paid social, organic search, email, direct and referral have different buying intent. Mobile checkout timeouts rise on days 18–24.
 
@@ -59,7 +59,9 @@ Filter `data_source = synthetic` for generated history or `data_source = live` f
 
 **Done when:** you have a hypothesis about the mobile checkout issue and can identify a marketing channel worth investigating.
 
-The backlog contains Analytics events. It does not create historical replay recordings, native experiment assignments, or Guides & Surveys delivery history. It does not delete existing project data. Resume the same run within seven days; that is Amplitude’s event deduplication window. **New dataset** creates a separate population and adds more data when sent.
+The backlog contains Analytics events. It does not create historical replay recordings, native experiment assignments, or Guides & Surveys delivery history. It does not delete existing project data. Resume the same run within seven days; that is Amplitude’s event deduplication window. **New dataset** creates a separate population and adds more data when sent. Older started datasets preserve their original traffic model so they can resume safely; choose New dataset to generate varied traffic.
+
+Uploads are tracked separately for each API key and region. If you change the key in Connect, the history tab is ready to send to that new project. Switching back restores the original project’s saved progress.
 
 ## 4. Try a better experience
 

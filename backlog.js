@@ -12,28 +12,52 @@ export const channels=[
 function hash(text){let n=2166136261;for(const ch of text){n^=ch.charCodeAt(0);n=Math.imul(n,16777619);}return n>>>0;}
 function rng(seed){let n=hash(seed);return()=>{n+=0x6D2B79F5;let t=n;t=Math.imul(t^t>>>15,t|1);t^=t+Math.imul(t^t>>>7,t|61);return((t^t>>>14)>>>0)/4294967296;};}
 function choose(list,r){return list[Math.floor(r()*list.length)];}
-function channel(r){let n=r()*100;return channels.find(c=>(n-=c.weight)<0)||channels.at(-1);}
-export function createRun(now=Date.now(),seed='spring-tech-v2',siteUrl=DEFAULT_SITE_URL) {return {version:2,siteUrl,seed,start:Math.floor(now/DAY)*DAY-30*DAY,days:30,usersPerDay:200,cursor:0,createdAt:now};}
+function channel(r,multipliers){
+ if(!multipliers){let n=r()*100;return channels.find(c=>(n-=c.weight)<0)||channels.at(-1);}
+ const weights=channels.map(c=>c.weight*(multipliers[c.name]||1));
+ let n=r()*weights.reduce((sum,w)=>sum+w,0);
+ return channels.find((_,i)=>(n-=weights[i])<0)||channels.at(-1);
+}
+export function createRun(now=Date.now(),seed='spring-tech-v3',siteUrl=DEFAULT_SITE_URL) {return {version:3,siteUrl,seed,start:Math.floor(now/DAY)*DAY-30*DAY,days:30,usersPerDay:200,cursor:0,createdAt:now};}
+export function dailyTraffic(run) {
+ const r=rng(`${run.seed}:${run.start}:daily-traffic`);
+ return Array.from({length:30},(_,day)=>{
+  if(run.version<3)return 200;
+  const weekday=new Date(run.start+day*DAY).getUTCDay();
+  const weekly=[.96,.87,.92,.98,1.03,1.14,1.10][weekday];
+  const growth=.95+.1*day/29;
+  const promotion=day===9||day===10||day>=23&&day<=25?1.25:1;
+  return Math.max(120,Math.min(340,Math.round(run.usersPerDay*weekly*growth*promotion*(.82+.36*r()))));
+ });
+}
 export function generateBacklog(run) {
- if(![1,2].includes(run.version)||run.days!==30||run.usersPerDay!==200||!Number.isFinite(run.start))throw new Error('Unsupported backlog recipe');
- // Preserve v1 recipes exactly: changing an in-progress dataset would invalidate saved upload offsets.
- const legacy=run.version===1;
+ if(![1,2,3].includes(run.version)||run.days!==30||run.usersPerDay!==200||!Number.isFinite(run.start))throw new Error('Unsupported backlog recipe');
+ // Preserve older recipes exactly: changing an in-progress dataset would invalidate saved upload offsets.
+ const legacy=run.version===1,variable=run.version>=3,visitorsByDay=dailyTraffic(run),people=[];
  const r=rng(`${run.seed}:${run.start}`),events=[],daily=[],unique=new Set();
- const summary={dailyVisitors:6000,uniqueUsers:0,sessions:0,purchases:0,errors:0,recoveredPurchases:0,revenue:0,channels:{},daily};
+ const summary={dailyVisitors:visitorsByDay.reduce((sum,n)=>sum+n,0),uniqueUsers:0,sessions:0,purchases:0,errors:0,recoveredPurchases:0,revenue:0,channels:{},daily};
  for(let day=0;day<30;day++){
-  const date=run.start+day*DAY,stat={date:new Date(date).toISOString().slice(0,10),visitors:200,purchases:0,errors:0};daily.push(stat);
-  for(let visitor=0;visitor<200;visitor++){
-   // Sixty visitors return across days; 140 are new. Exactly 200 distinct devices on each day.
-   const person=visitor<60?`returning-${visitor}`:`new-${day}-${visitor}`;
-   const namespace=hash(legacy?run.seed:`${run.seed}:v2`).toString(16);
-   const device=`seed-${namespace}-${person}`,known=visitor<60||r()<.30;
+  const date=run.start+day*DAY,visitors=visitorsByDay[day],stat={date:new Date(date).toISOString().slice(0,10),visitors,purchases:0,errors:0};daily.push(stat);
+  const tr=rng(`${run.seed}:${day}:returning-visitors`),eligible=variable?[...people]:[];
+  const returnCount=variable?Math.min(eligible.length,Math.round(visitors*(.18+.24*tr()))):60;
+  const returning=[];
+  for(let i=0;variable&&i<returnCount;i++){const at=i+Math.floor(tr()*(eligible.length-i));[eligible[i],eligible[at]]=[eligible[at],eligible[i]];returning.push(eligible[i]);}
+  const weekday=new Date(date).getUTCDay();
+  const multipliers=variable?{'Paid Social':weekday===0||weekday===6?1.45:.9,'Paid Search':day===9||day===10||day>=23&&day<=25?1.4:1,'Email':weekday===2||weekday===5?2.4:.55}:null;
+  for(let visitor=0;visitor<visitors;visitor++){
+   const isReturning=visitor<returnCount;
+   const person=variable?(isReturning?returning[visitor]:`new-${day}-${visitor}`):(isReturning?`returning-${visitor}`:`new-${day}-${visitor}`);
+   if(variable&&!isReturning)people.push(person);
+   const namespace=hash(legacy?run.seed:`${run.seed}:v${run.version}`).toString(16);
+   const personRng=rng(`${run.seed}:${person}`);
+   const device=`seed-${namespace}-${person}`,known=variable?personRng()<.55:isReturning||r()<.30;
    unique.add(device);const user=known?`shopper-${namespace}-${person}`:null;
-   const personRng=rng(`${run.seed}:${person}`);const mobile=personRng()<.59,ch=channel(r),p=choose(products.filter(p=>p.category!=='games'||r()<.5),r);
+   const mobile=personRng()<.59,ch=channel(r,multipliers),p=choose(products.filter(p=>p.category!=='games'||r()<.5),r);
    const country=choose(['Australia','Australia','Australia','New Zealand','United States','United Kingdom'],personRng);
-   const userProps={rewards_tier:visitor<60?'Gold':known?'Bronze':'None',customer_type:visitor<60?'Returning':'New',preferred_category:p.category};
+   const userProps={rewards_tier:isReturning?'Gold':known?'Bronze':'None',customer_type:isReturning?'Returning':'New',preferred_category:p.category};
    const common={...productProperties(p),channel:ch.name,utm_source:ch.source,utm_medium:ch.medium,utm_campaign:ch.campaign,referrer:ch.referrer,device_type:mobile?'Mobile':'Desktop',customer_type:userProps.customer_type,data_source:'synthetic',dataset:run.seed,store:'Amplitronics'};
    summary.channels[ch.name]=(summary.channels[ch.name]||0)+1;
-   const sessions=r()<.18?2:1;
+   const sessions=r()<(variable?(isReturning?.27:.12):.18)?2:1;
    for(let session=0;session<sessions;session++){
     summary.sessions++;const sid=date+(7*60*60+Math.floor(r()*11*60*60)+session*3*60*60)*1000;let time=sid,index=0;
     const emit=(name,props={},extra={})=>{time+=Math.floor(3+r()*35)*1000;events.push({event_type:name,device_id:device,...(user?{user_id:user}:{}),session_id:sid,time,insert_id:`${device}-${date}-${session}-${index++}`,platform:'Web',os_name:mobile?'iOS':'Windows',country,language:'en',user_properties:userProps,event_properties:{...common,...props},...extra});};

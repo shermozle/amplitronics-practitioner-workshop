@@ -65,9 +65,9 @@ The hero artwork is copied from the user-provided reference site. All product il
 
 ## Historical generator
 
-`backlog.js` produces a repeatable population with a locally saved seed and UTC start date. It covers the last 30 complete UTC days, exactly 200 distinct daily visitors. Sixty return each day and 140 new visitors arrive daily, yielding 4,260 unique users / 6,000 visitor-days, plus repeat sessions within a day.
+`backlog.js` produces a repeatable population with a locally saved seed and UTC start date. It covers the last 30 complete UTC days with daily traffic averaging around 200 visitors. Counts vary with weekday shopping patterns, modest growth, promotion spikes, and seeded daily noise (bounded at 120–340 visitors). Each day selects a changing share of returning shoppers from actual prior visitors, with the remainder new. Return visits, campaign traffic, and repeat-session rates vary across the period; the preview shows the actual average, range, and totals.
 
-Traffic is weighted across Google paid search, Instagram paid social, organic search, email, direct, and an explicitly fictional referral domain. Channel intent changes conversion probability. Events have ordered timestamps and consistent funnels; purchases follow payment attempts, and some failures recover. Mobile payment timeouts increase on days 18–24 for a diagnosis exercise. Every synthetic event includes `data_source: synthetic`, a `dataset` value and marketing/device properties. It does not impersonate reserved native replay, experiment, or survey events.
+Traffic is weighted across Google paid search, Instagram paid social, organic search, email, direct, and an explicitly fictional referral domain. Channel intent changes conversion probability. Email traffic increases on campaign weekdays, paid social grows at weekends, and paid search rises during promotional periods. Returning shoppers are sampled without replacement within each day and keep their device identity. Events have ordered timestamps and consistent funnels; purchases follow payment attempts, and some failures recover. Mobile payment timeouts increase on days 18–24 for a diagnosis exercise. Every synthetic event includes `data_source: synthetic`, a `dataset` value and marketing/device properties. It does not impersonate reserved native replay, experiment, or survey events.
 
 Uploads go directly to `https://api2.amplitude.com/2/httpapi` (US) or `https://api.eu.amplitude.com/2/httpapi` (EU) with the public project key. Three workers send batches of at most 10 events, paced by at least 100ms per worker, keeping the maximum nominal send rate under 300 events/second and 30 requests/second before network latency. This is below the documented Free-plan project/request rates. A per-request 20-second timeout prevents hanging progress.
 
@@ -79,9 +79,9 @@ Uploads go directly to `https://api2.amplitude.com/2/httpapi` (US) or `https://a
 - Pause: abort in-flight work and preserve the last acknowledged prefix. Ambiguous requests are retried with identical insert IDs.
 - Resume: regenerate from the recipe, verify the project fingerprint and seven-day deduplication window, continue at the checkpoint. A newly generated dataset is a separate population and adds new data.
 
-New recipes use version 2 with a fixed site URL. Version 1 recipes that have already started retain their original generation and event order so saved upload positions remain valid. Unsent version 1 recipes are replaced on the next preview. Choose **New dataset** for Autocapture-compatible page views when an older recipe is present; already-ingested project events are not changed.
+New recipes use version 3 with a fixed site URL and variable traffic. Version 1 and 2 recipes that have already started retain their original generation and event order so saved upload positions remain valid. Unsent older recipes are upgraded on selection. Choose **New dataset** for the new traffic model when a started older recipe is present; already-ingested project events are not changed.
 
-A checkpoint is small and lives in localStorage; event datasets are regenerated, not stored there. The SHA-256 project fingerprint prevents accidentally resuming to a different project without duplicating the API key in the recipe. Checkpoint saves must succeed before uploading continues.
+A checkpoint is small and lives in localStorage; event datasets are regenerated, not stored there. Progress is stored separately under each SHA-256 API-key-and-region fingerprint, without duplicating the key in the recipe. Changing the API key or region selects that project’s saved progress, or starts a fresh dataset when no progress exists. Switching back restores the previous project’s checkpoint. Existing singleton progress is migrated to its original project. Checkpoint saves must succeed before uploading continues.
 
 Historical API events populate Analytics only. They cannot generate past browser replay recordings, real native experiment allocations, or guide/survey delivery artefacts. Run live sessions for those products. An actual Amplitude API key is intentionally not bundled, so end-to-end ingestion and project-delivered product experiences require participant verification.
 
@@ -95,6 +95,7 @@ Historical API events populate Analytics only. They cannot generate past browser
 | `commerce.js` | Pure totals, validation and payment simulation |
 | `telemetry.js`, `storage.js` | SDK lifecycle, identity, event inspector, persistence |
 | `backlog.js` | Deterministic journeys and resumable HTTP uploader |
+| `backfill-state.js` | Per-project upload state and legacy checkpoint migration |
 | `tracking-plan.csv` | Custom event and property map |
 | `QUICKSTART.md` | Participant instructions |
 | `server.mjs` | Optional local static preview server |

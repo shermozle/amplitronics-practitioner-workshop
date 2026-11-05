@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import {createRun,generateBacklog,sendBatch,uploadBacklog} from '../backlog.js';
 const now=Date.UTC(2026,10,5,12),run=createRun(now,'test-fixture'),data=generateBacklog(run);
 test('historical page views match Autocapture schema and follow the actual hash routes',()=>{
- assert.equal(run.version,2);
+ assert.equal(run.version,3);
  assert(!data.events.some(event=>event.event_type==='Page Viewed'));
  const views=data.events.filter(event=>event.event_type==='[Amplitude] Page Viewed');
  assert(views.length>data.summary.sessions);
@@ -27,10 +27,13 @@ test('historical page views match Autocapture schema and follow the actual hash 
  const checkoutSessions=Map.groupBy(data.events,event=>`${event.device_id}:${event.session_id}`);
  for(const session of checkoutSessions.values())if(session.some(event=>event.event_type==='Payment Submitted'))assert.equal(session.filter(event=>event.event_type==='[Amplitude] Page Viewed'&&new URL(event.event_properties['[Amplitude] Page Location']).hash==='#/checkout').length,1);
 });
-test('30 complete UTC days, exactly 200 distinct daily visitors, returning users',()=>{
+test('30 complete UTC days with variable daily visitors and actual returning shoppers',()=>{
  const days=new Map();for(const event of data.events){const date=new Date(event.time).toISOString().slice(0,10);if(!days.has(date))days.set(date,new Set());days.get(date).add(event.device_id);assert(event.time<Math.floor(now/86400000)*86400000);assert(event.time>=run.start);assert(event.session_id<=event.time);}
- assert.equal(days.size,30);for(const ids of days.values())assert.equal(ids.size,200);
- assert.equal(data.summary.uniqueUsers,4260);assert.equal(data.summary.dailyVisitors,6000);
+ assert.equal(days.size,30);for(const [date,ids] of days)assert.equal(ids.size,data.summary.daily.find(day=>day.date===date).visitors);
+ const counts=[...days.values()].map(ids=>ids.size);assert(new Set(counts).size>=20);assert(Math.max(...counts)-Math.min(...counts)>=60);
+ assert(data.summary.dailyVisitors>5000&&data.summary.dailyVisitors<7500);assert.equal(data.summary.dailyVisitors,counts.reduce((sum,n)=>sum+n,0));
+ assert.equal(data.summary.uniqueUsers,new Set(data.events.map(e=>e.device_id)).size);assert(data.summary.uniqueUsers<data.summary.dailyVisitors*.9);
+ const visits=Map.groupBy(data.events,e=>`${new Date(e.time).toISOString().slice(0,10)}:${e.device_id}`);const firstDay=new Set();for(const [date,ids] of days){for(const device of ids){assert(visits.get(`${date}:${device}`).every(e=>e.event_properties.customer_type===(firstDay.has(device)?'Returning':'New')));}for(const device of ids)firstDay.add(device);}
  assert.deepEqual(generateBacklog(run),data);
  assert.equal(new Set(data.events.map(e=>e.insert_id)).size,data.events.length);
 });
@@ -70,4 +73,9 @@ test('pause stops outstanding work without losing resumable position',async()=>{
 test('legacy recipes regenerate byte-for-byte to preserve existing upload checkpoints',()=>{
  const legacy={version:1,seed:'legacy-fixture',start:Math.floor(now/86400000)*86400000-30*86400000,days:30,usersPerDay:200,cursor:0,createdAt:now};
  assert.equal(createHash('sha256').update(JSON.stringify(generateBacklog(legacy))).digest('hex'),'78ab33c4f9f485029d48013d819a697c852b5fb9cbfa17c0c39f1697f15389f7');
+});
+
+test('version 2 recipes preserve event bytes and upload ordering',()=>{
+ const legacy={version:2,siteUrl:'https://shermozle.github.io/amplitronics-practitioner-workshop/',seed:'legacy-v2-fixture',start:Math.floor(now/86400000)*86400000-30*86400000,days:30,usersPerDay:200,cursor:0,createdAt:now};
+ assert.equal(createHash('sha256').update(JSON.stringify(generateBacklog(legacy))).digest('hex'),'e21378929a14100df53930420295e225144852f0be7c4cb1b40827618820d1d9');
 });
