@@ -7,7 +7,7 @@ This fictional store works for analytics practitioners, product managers, and de
 ## Connect your Amplitude project
 
 1. Open the **cog at the bottom-left** of any page.
-2. Paste your Amplitude **project API key** into Connect. Use the US default, or choose EU to match your project.
+2. Select **Connect** and paste your Amplitude **project API key**. Use the US default, or choose EU to match your project.
 3. Leave the product switches enabled, then click **Save & connect**. The browser reloads. The key stays in localStorage on this device.
 4. In Events, look for custom event upload results. **Local** means the SDK was not connected when the event happened. **Sent** means Amplitude acknowledged it. The automatic event inspector observes events before upload, so check those in Amplitude’s debugger or User Lookup.
 
