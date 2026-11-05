@@ -6,3 +6,5 @@
 @media(max-width:760px){nav{scrollbar-width:none}nav::-webkit-scrollbar{display:none}}
 
 .getting-started-links{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0 24px}.getting-started-links .btn{font-size:11px}.getting-started-steps{list-style:none;counter-reset:setup-step;padding:0;margin:0 0 24px;display:grid;gap:18px}.getting-started-steps li{counter-increment:setup-step;position:relative;padding-left:40px;min-height:29px;font-size:12px;line-height:1.65}.getting-started-steps li:before{content:counter(setup-step);position:absolute;left:0;top:0;display:grid;place-items:center;width:27px;height:27px;border-radius:50%;background:#eae2f7;color:#6945a2;font-size:11px;font-weight:700}.getting-started-steps strong{display:block;margin-bottom:3px}.getting-started-steps span{display:block;color:var(--muted);font-size:11px}.getting-started-steps span b{color:var(--ink)}
+
+.project-ai-context{border-top:1px solid var(--line);padding-top:24px;margin:28px 0}.project-ai-context textarea{font-size:12px;line-height:1.7;resize:vertical;min-height:210px}.project-ai-context button{margin-top:12px;font-size:11px}
